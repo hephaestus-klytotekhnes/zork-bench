@@ -658,6 +658,13 @@ def _run_openai(client, model, system_prompt, tool_schemas, messages,
                  "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
                 for tc in message.tool_calls
             ]
+        # Reasoning models (e.g. GLM) sometimes return a turn with only
+        # reasoning_content and no visible content or tool call. An assistant
+        # message carrying neither content nor tool_calls is rejected by strict
+        # OpenAI-compatible endpoints on the next request (400 VALIDATION_ERROR),
+        # which poisons the whole conversation. Ensure content is always set.
+        if "content" not in msg_dict and "tool_calls" not in msg_dict:
+            msg_dict["content"] = thinking_text or "(no command issued)"
         messages.append(msg_dict)
 
     # Handle proper tool calls
