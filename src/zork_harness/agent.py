@@ -79,6 +79,20 @@ _BASE_PROMPT = """\
 You are playing Zork, a classic text adventure game. Your goal is to explore the world, \
 collect treasures, solve puzzles, and maximize your score.
 
+Parser conventions (these games expect a specific command style):
+- Interact mainly with verb-noun commands, such as EXAMINE DESK, TAKE SCREWDRIVER, or \
+SEARCH SHED. A single verb might give you more clues, like LISTEN, SMELL, or INVENTORY. \
+To repeat a room description, use LOOK.
+- Sometimes a preposition is needed, as in SIT ON CHAIR or LOOK BEHIND POSTER. Very rarely \
+you need an additional noun phrase, like HIT DOOR WITH AXE.
+- Adverbs are never used; you will never be required to do anything CAREFULLY or \
+THOROUGHLY. Do not pile on extra words: prefer EXAMINE KEYHOLE over "examine the inside \
+of the door keyhole", and GO SOUTH over "enter the southern door to the bathroom".
+- When in doubt, prefer to examine your surroundings to gather clues, rather than trying \
+inventive solutions you happen to think of.
+- If the game asks you to disambiguate ("Do you mean the X or the Y?"), copy the exact \
+phrasing the game used to say which one you mean.
+
 Rules:
 - Use short, imperative commands: "go north", "take lamp", "open mailbox", "look", "inventory".
 - Do not use elaborate sentences. The game parser only understands simple commands.
@@ -739,7 +753,20 @@ def run_agent(
                 print("Error: FIREWORKS_API_KEY environment variable is not set.")
                 print("Run: export FIREWORKS_API_KEY=your-key-here")
                 sys.exit(1)
-            client = OpenAI(api_key=api_key, base_url=url)
+            client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.fireworks.ai/inference/v1",
+            )
+        elif backend == "openrouter":
+            api_key = os.environ.get("OPENROUTER_API_KEY")
+            if not api_key:
+                print("Error: OPENROUTER_API_KEY environment variable is not set.")
+                print("Run: export OPENROUTER_API_KEY=your-key-here")
+                sys.exit(1)
+            client = OpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
         elif backend == "openai":
             kwargs: dict = {}
             if base_url:
@@ -1006,6 +1033,8 @@ def run_agent(
             viewer.log_event("command", command=command, output=game_output, room=room)
 
         score = session.get_score()
+        if viewer:
+            viewer.set_score(score)
 
         logger.log_turn(
             turn=turn,
@@ -1062,9 +1091,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=["anthropic", "fireworks", "openai", "human"],
+        choices=["anthropic", "fireworks", "openrouter", "openai", "human"],
         default="fireworks",
-        help="API backend: fireworks (default), anthropic, openai, human (play yourself).",
+        help="API backend: fireworks (default), anthropic, openrouter, openai, human (play yourself).",
     )
     parser.add_argument(
         "--model",
@@ -1153,6 +1182,7 @@ def main() -> None:
         defaults = {
             "fireworks": "accounts/fireworks/models/glm-5p1",
             "anthropic": "claude-sonnet-4-6",
+            "openrouter": "openai/gpt-5.4",
             "openai": "gpt-4o",
             "human": "human",
         }
